@@ -762,18 +762,74 @@ ${hint ? `- 다음 테마를 참고해줘: ${hint}` : ''}
     words = words.filter(w => w.answer.length >= 2);
     if (words.length < 1) return null;
 
+    function finalize(placed){
+      let minR=Infinity,maxR=-Infinity,minC=Infinity,maxC=-Infinity;
+      placed.forEach(p => {
+        const endR = p.dir==='down' ? p.row+p.answer.length-1 : p.row;
+        const endC = p.dir==='across' ? p.col+p.answer.length-1 : p.col;
+        minR = Math.min(minR, p.row); maxR = Math.max(maxR, endR);
+        minC = Math.min(minC, p.col); maxC = Math.max(maxC, endC);
+      });
+      const rows = maxR-minR+1, cols = maxC-minC+1;
+      const cells = Array.from({length: rows}, () => Array(cols).fill(null));
+      placed.forEach(p => {
+        for (let i=0;i<p.answer.length;i++){
+          const r = (p.dir==='down' ? p.row+i : p.row) - minR;
+          const c = (p.dir==='across' ? p.col+i : p.col) - minC;
+          cells[r][c] = { letter: p.answer[i] };
+        }
+      });
+      let num = 1;
+      const numAt = {};
+      for (let r=0;r<rows;r++){
+        for (let c=0;c<cols;c++){
+          if (!cells[r][c]) continue;
+          const startsAcross = (c===0 || !cells[r][c-1]) && c+1<cols && cells[r][c+1];
+          const startsDown = (r===0 || !cells[r-1][c]) && r+1<rows && cells[r+1][c];
+          if (startsAcross || startsDown){
+            numAt[r+','+c] = num;
+            cells[r][c].num = num;
+            num++;
+          }
+        }
+      }
+      const wordsOut = placed
+        .map(p => {
+          const r = p.row - minR, c = p.col - minC;
+          return { answer: p.answer, clue: p.clue, dir: p.dir, num: numAt[r+','+c] || 0 };
+        })
+        .filter(w => w.num > 0); // not a true run-start — it's a substring of another placed word; drop the redundant clue
+      const area = rows * cols;
+      return { rows, cols, cells, words: wordsOut, area };
+    }
+
     function tryLayout(orderedWords){
       const placed = [];
       const skipped = [];
       const occ = {};
 
       function canPlace(answer, dir, row, col){
+        const beforeR = dir==='down' ? row-1 : row;
+        const beforeC = dir==='across' ? col-1 : col;
+        if (occ[beforeR+','+beforeC] !== undefined) return false;
+        const afterR = dir==='down' ? row+answer.length : row;
+        const afterC = dir==='across' ? col+answer.length : col;
+        if (occ[afterR+','+afterC] !== undefined) return false;
+
         for (let i=0;i<answer.length;i++){
           const r = dir==='down' ? row+i : row;
           const c = dir==='across' ? col+i : col;
           const key = r+','+c;
           const existing = occ[key];
-          if (existing !== undefined && existing !== answer[i]) return false;
+          if (existing !== undefined){
+            if (existing !== answer[i]) return false;
+          } else {
+            if (dir === 'across'){
+              if (occ[(r-1)+','+c] !== undefined || occ[(r+1)+','+c] !== undefined) return false;
+            } else {
+              if (occ[r+','+(c-1)] !== undefined || occ[r+','+(c+1)] !== undefined) return false;
+            }
+          }
         }
         return true;
       }
@@ -788,8 +844,7 @@ ${hint ? `- 다음 테마를 참고해줘: ${hint}` : ''}
       place(orderedWords[0].answer, 'across', 0, 0);
       placed.push({...orderedWords[0], dir:'across', row:0, col:0});
 
-      for (let i=1;i<orderedWords.length;i++){
-        const w = orderedWords[i];
+      function attemptPlace(w){
         let bestSpot = null;
         for (let pi=0; pi<placed.length && !bestSpot; pi++){
           const p = placed[pi];
@@ -807,58 +862,30 @@ ${hint ? `- 다음 테마를 참고해줘: ${hint}` : ''}
         if (bestSpot){
           place(w.answer, bestSpot.dir, bestSpot.row, bestSpot.col);
           placed.push({...w, dir:bestSpot.dir, row:bestSpot.row, col:bestSpot.col});
-        } else {
-          // can't interlock this word anywhere yet — skip it rather than
-          // bolt it on disconnected; a later attempt or later word may still work
-          skipped.push(w);
+          return true;
         }
-      }
-      // second pass: retry skipped words now that more of the grid is filled in
-      let stillSkipped = [];
-      for (const w of skipped){
-        let bestSpot = null;
-        for (let pi=0; pi<placed.length && !bestSpot; pi++){
-          const p = placed[pi];
-          for (let a=0;a<w.answer.length && !bestSpot;a++){
-            for (let b=0;b<p.answer.length && !bestSpot;b++){
-              if (w.answer[a] !== p.answer[b]) continue;
-              const newDir = p.dir === 'across' ? 'down' : 'across';
-              let row, col;
-              if (newDir === 'down'){ row = p.row - a; col = p.col + b; }
-              else { row = p.row + b; col = p.col - a; }
-              if (canPlace(w.answer, newDir, row, col)) bestSpot = {dir:newDir, row, col};
-            }
-          }
-        }
-        if (bestSpot){
-          place(w.answer, bestSpot.dir, bestSpot.row, bestSpot.col);
-          placed.push({...w, dir:bestSpot.dir, row:bestSpot.row, col:bestSpot.col});
-        } else {
-          stillSkipped.push(w);
-        }
+        return false;
       }
 
-      let minR=Infinity,maxR=-Infinity,minC=Infinity,maxC=-Infinity;
-      placed.forEach(p => {
-        const endR = p.dir==='down' ? p.row+p.answer.length-1 : p.row;
-        const endC = p.dir==='across' ? p.col+p.answer.length-1 : p.col;
-        minR = Math.min(minR, p.row); maxR = Math.max(maxR, endR);
-        minC = Math.min(minC, p.col); maxC = Math.max(maxC, endC);
-      });
-      const area = (maxR-minR+1) * (maxC-minC+1);
-      return { placed, minR, maxR, minC, maxC, area };
+      for (let i=1;i<orderedWords.length;i++){
+        if (!attemptPlace(orderedWords[i])) skipped.push(orderedWords[i]);
+      }
+      // second pass: retry skipped words now that more of the grid is filled in
+      for (const w of skipped) attemptPlace(w);
+
+      return finalize(placed);
     }
 
     // The incoming order (from pickRandomWords, or the AI) already tends to place
     // each word after something it overlaps with — try that order first, since
     // re-sorting by length would throw away that guarantee. Then explore shuffles
-    // to see if a different order lets MORE words interlock, keeping the best —
-    // any word that still can't interlock anywhere is left out entirely, so the
-    // final puzzle is always fully connected.
+    // to see if a different order lets MORE distinct words interlock, keeping the
+    // best (scored by actual distinct clues, not raw placement count, so a word
+    // that only ends up as a hidden substring of another doesn't count).
     const base = [...words];
     let best = tryLayout(base);
     const attempts = Math.min(120, 20 + words.length * 6);
-    for (let attempt=0; attempt<attempts && best.placed.length < words.length; attempt++){
+    for (let attempt=0; attempt<attempts && best.words.length < words.length; attempt++){
       const rest = base.slice(1);
       for (let i=rest.length-1;i>0;i--){
         const j = Math.floor(Math.random()*(i+1));
@@ -866,44 +893,14 @@ ${hint ? `- 다음 테마를 참고해줘: ${hint}` : ''}
       }
       const ordered = [base[0], ...rest];
       const result = tryLayout(ordered);
-      if (result.placed.length > best.placed.length ||
-          (result.placed.length === best.placed.length && result.area < best.area)) {
+      if (result.words.length > best.words.length ||
+          (result.words.length === best.words.length && result.area < best.area)) {
         best = result;
       }
-      if (best.placed.length === words.length) break;
+      if (best.words.length === words.length) break;
     }
 
-    const { placed, minR, maxR, minC, maxC } = best;
-    const rows = maxR-minR+1, cols = maxC-minC+1;
-    const cells = Array.from({length: rows}, () => Array(cols).fill(null));
-    placed.forEach(p => {
-      for (let i=0;i<p.answer.length;i++){
-        const r = (p.dir==='down' ? p.row+i : p.row) - minR;
-        const c = (p.dir==='across' ? p.col+i : p.col) - minC;
-        cells[r][c] = { letter: p.answer[i] };
-      }
-    });
-
-    let num = 1;
-    const numAt = {};
-    for (let r=0;r<rows;r++){
-      for (let c=0;c<cols;c++){
-        if (!cells[r][c]) continue;
-        const startsAcross = (c===0 || !cells[r][c-1]) && c+1<cols && cells[r][c+1];
-        const startsDown = (r===0 || !cells[r-1][c]) && r+1<rows && cells[r+1][c];
-        if (startsAcross || startsDown){
-          numAt[r+','+c] = num;
-          cells[r][c].num = num;
-          num++;
-        }
-      }
-    }
-    const wordsOut = placed.map(p => {
-      const r = p.row - minR, c = p.col - minC;
-      return { answer: p.answer, clue: p.clue, dir: p.dir, num: numAt[r+','+c] || 0 };
-    });
-
-    return { rows, cols, cells, words: wordsOut };
+    return best;
   }
 
   (async function init(){
