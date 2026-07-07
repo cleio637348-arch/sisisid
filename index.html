@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>사진을 잠그는 십자말풀이</title>
+<title>뉴짤 잠금기</title>
 <style>
 html, body {
   margin: 0;
@@ -218,17 +218,26 @@ html, body {
   }
 
   let resizeTimer = null;
+  let lastWidth = window.innerWidth;
   window.addEventListener('resize', () => {
     if (state.screen !== 'solve') return;
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => render(), 200);
+    resizeTimer = setTimeout(() => {
+      // mobile keyboards fire 'resize' too (they shrink the viewport HEIGHT),
+      // which would blur the focused cell and bounce the keyboard shut.
+      // Only rebuild the grid when the WIDTH actually changed (rotation/real resize).
+      const w = window.innerWidth;
+      if (w === lastWidth) return;
+      lastWidth = w;
+      render();
+    }, 200);
   });
 
   function renderHome(){
     root.innerHTML = `
       <div class="plc-wrap">
         <div class="plc-eyebrow">Photo Lock</div>
-        <h1 class="plc-title">사진을 잠그는 십자말풀이</h1>
+        <h1 class="plc-title">뉴짤 잠금기</h1>
         <p class="plc-sub">사진을 올리고 십자말풀이를 만들면, 상대방은 퍼즐을 다 풀어야만 사진을 볼 수 있어요.</p>
         <div class="plc-home-grid">
           <button class="plc-home-btn" id="btnCreate">
