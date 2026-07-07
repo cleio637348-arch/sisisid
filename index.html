@@ -39,6 +39,16 @@
 }
 .plc-sub { color: var(--text-dim); font-size: 14px; margin: 0 0 26px; line-height: 1.5; }
 
+@media (max-width: 480px) {
+  .plc-root { padding: 20px 14px 32px; min-height: 0; }
+  .plc-title { font-size: 24px; }
+  .plc-sub { font-size: 13px; margin-bottom: 20px; }
+  .plc-clues { grid-template-columns: 1fr !important; gap: 14px !important; }
+  .plc-code { font-size: 21px; }
+  .plc-link-box .url { font-size: 11px; }
+}
+
+
 .plc-home-grid { display: grid; gap: 14px; }
 .plc-home-btn {
   background: var(--surface);
@@ -192,6 +202,13 @@
     if (state.screen === 'solve') return renderSolve();
   }
 
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    if (state.screen !== 'solve') return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => render(), 200);
+  });
+
   function renderHome(){
     root.innerHTML = `
       <div class="plc-wrap">
@@ -280,7 +297,7 @@
       } catch (e) {
         usedBank = true;
         loadingBox.innerHTML = `<div class="plc-loading"><div class="plc-spinner"></div>사진 분석을 쓸 수 없어 무작위 단어로 만드는 중...</div>`;
-        wordList = pickRandomWords(14);
+        wordList = pickRandomWords(18);
       }
 
       const cleaned = wordList
@@ -296,7 +313,8 @@
       }
 
       loadingBox.innerHTML = `<div class="plc-loading"><div class="plc-spinner"></div>퍼즐을 배치하는 중...</div>`;
-      const puzzle = buildCrossword(unique);
+      const ordered = orderForConnectivity(unique);
+      const puzzle = buildCrossword(ordered);
       if (!puzzle) { errBox.textContent = '퍼즐을 생성하지 못했어요. 다시 시도해주세요.'; genBtn.disabled=false; loadingBox.innerHTML=''; return; }
       puzzle.source = usedBank ? 'bank' : 'ai';
 
@@ -332,108 +350,151 @@
   }
 
   const WORD_BANK = [
+    // 사 hub
     {answer:'사랑', clue:'마음이 향하는 가장 따뜻한 감정'},
-    {answer:'우정', clue:'친구 사이에 쌓이는 믿음'},
-    {answer:'추억', clue:'지나간 시간이 남긴 기억'},
-    {answer:'여행', clue:'낯선 곳으로 떠나는 일'},
-    {answer:'바다', clue:'파도가 치는 넓고 짠 물'},
-    {answer:'하늘', clue:'구름이 떠다니는 머리 위 공간'},
-    {answer:'구름', clue:'하늘에 떠 있는 하얀 덩어리'},
-    {answer:'바람', clue:'눈에 안 보이지만 느껴지는 움직임'},
-    {answer:'눈물', clue:'슬프거나 감동할 때 흐르는 것'},
-    {answer:'미소', clue:'살짝 웃는 표정'},
-    {answer:'행복', clue:'마음이 만족스럽고 즐거운 상태'},
-    {answer:'설렘', clue:'좋은 일 앞에서 두근거리는 마음'},
-    {answer:'그리움', clue:'보고 싶은 마음이 쌓인 감정'},
-    {answer:'고양이', clue:'야옹 소리를 내는 반려동물'},
-    {answer:'강아지', clue:'멍멍 짖는 반려동물'},
-    {answer:'토끼', clue:'귀가 길고 깡충 뛰는 동물'},
-    {answer:'거북이', clue:'등에 딱딱한 껍질을 진 느린 동물'},
-    {answer:'나비', clue:'꽃을 좋아하는 날개 달린 곤충'},
-    {answer:'벚꽃', clue:'봄에 흩날리는 분홍빛 꽃'},
-    {answer:'단풍', clue:'가을에 붉게 물드는 나뭇잎'},
-    {answer:'눈사람', clue:'겨울에 눈을 뭉쳐 만드는 것'},
-    {answer:'우산', clue:'비 올 때 머리 위에 펴는 물건'},
-    {answer:'커피', clue:'아침을 깨우는 쌉싸름한 음료'},
-    {answer:'초콜릿', clue:'달콤하고 녹는 갈색 간식'},
-    {answer:'케이크', clue:'생일에 촛불을 꽂는 디저트'},
-    {answer:'라면', clue:'끓는 물에 넣고 3분 기다리는 면'},
-    {answer:'김치', clue:'매콤하게 발효시킨 한국 반찬'},
-    {answer:'딸기', clue:'빨갛고 씨가 겉에 박힌 과일'},
-    {answer:'사과', clue:'하루 하나면 의사가 필요 없다는 과일'},
-    {answer:'수박', clue:'여름을 대표하는 크고 둥근 과일'},
-    {answer:'도서관', clue:'책이 가득한 조용한 공간'},
-    {answer:'학교', clue:'매일 아침 가방 메고 가는 곳'},
-    {answer:'교실', clue:'칠판과 책상이 있는 공간'},
-    {answer:'운동장', clue:'뛰어놀고 체육하는 넓은 마당'},
-    {answer:'놀이터', clue:'그네와 미끄럼틀이 있는 곳'},
-    {answer:'편지', clue:'마음을 담아 손으로 쓰는 글'},
-    {answer:'일기', clue:'하루를 돌아보며 쓰는 글'},
     {answer:'사진', clue:'순간을 남기는 네모난 기록'},
-    {answer:'음악', clue:'귀를 즐겁게 하는 소리의 예술'},
-    {answer:'영화', clue:'어두운 극장에서 보는 이야기'},
-    {answer:'게임', clue:'즐기려고 규칙을 따라 노는 활동'},
-    {answer:'주사위', clue:'굴려서 숫자를 정하는 육면체'},
-    {answer:'모험', clue:'위험을 무릅쓰고 떠나는 여정'},
-    {answer:'마법', clue:'현실에서는 일어나지 않는 신비한 힘'},
-    {answer:'보물', clue:'숨겨져 있어 찾으면 기쁜 귀한 것'},
-    {answer:'지도', clue:'길을 찾을 때 펼쳐보는 그림'},
-    {answer:'열쇠', clue:'잠긴 문을 여는 작은 도구'},
-    {answer:'등대', clue:'밤바다에서 배를 안내하는 불빛'},
-    {answer:'다리', clue:'강이나 계곡을 건너게 해주는 구조물'},
-    {answer:'기차', clue:'철길 위를 달리는 긴 탈것'},
-    {answer:'자전거', clue:'두 바퀴로 페달을 밟아 가는 탈것'},
-    {answer:'비행기', clue:'하늘을 날아 먼 곳까지 가는 탈것'},
-    {answer:'우주', clue:'별과 행성이 떠 있는 끝없는 공간'},
-    {answer:'별빛', clue:'밤하늘에서 반짝이는 빛'},
-    {answer:'달빛', clue:'밤에 은은하게 비추는 빛'},
-    {answer:'노을', clue:'해질 무렵 하늘을 물들이는 색'},
-    {answer:'새벽', clue:'해가 뜨기 직전의 고요한 시간'},
-    {answer:'계절', clue:'봄여름가을겨울을 부르는 말'},
-    {answer:'겨울', clue:'눈이 내리고 가장 추운 계절'},
-    {answer:'여름', clue:'덥고 매미가 우는 계절'},
+    {answer:'사람', clue:'말하고 생각하는 존재'},
+    {answer:'사과', clue:'하루 하나면 의사가 필요 없다는 과일'},
+    {answer:'사탕', clue:'입에 넣으면 살살 녹는 단 것'},
+    {answer:'사자', clue:'초원의 왕이라 불리는 동물'},
+    {answer:'인사', clue:'만나거나 헤어질 때 하는 예의'},
+    {answer:'감사', clue:'고마운 마음을 표현하는 것'},
+    {answer:'회사', clue:'매일 출근해서 일하는 곳'},
+    // 바 hub
+    {answer:'바다', clue:'파도가 치는 넓고 짠 물'},
+    {answer:'바람', clue:'눈에 안 보이지만 느껴지는 움직임'},
+    {answer:'바지', clue:'다리에 입는 옷'},
+    {answer:'바늘', clue:'실을 꿰어 옷을 꿰매는 뾰족한 도구'},
+    {answer:'바닥', clue:'발이 딛고 있는 아래쪽 면'},
+    // 나 hub
+    {answer:'나무', clue:'뿌리와 줄기, 잎이 있는 식물'},
+    {answer:'나비', clue:'꽃을 좋아하는 날개 달린 곤충'},
+    {answer:'나라', clue:'국경으로 나뉜 하나의 국가'},
+    {answer:'하나', clue:'숫자 1을 뜻하는 순우리말'},
+    // 가 hub
+    {answer:'가족', clue:'함께 살며 서로 아끼는 사람들'},
     {answer:'가을', clue:'단풍이 들고 선선해지는 계절'},
-    {answer:'봄날', clue:'꽃이 피고 따뜻해지는 시절'},
-    {answer:'축제', clue:'다 함께 즐기는 큰 행사'},
-    {answer:'불꽃놀이', clue:'밤하늘에 터지는 화려한 빛'},
-    {answer:'생일', clue:'태어난 날을 기념하는 날'},
+    {answer:'가방', clue:'물건을 넣어 어깨에 메는 것'},
+    {answer:'가수', clue:'노래를 부르는 직업'},
+    {answer:'국가', clue:'영토와 국민, 주권이 있는 공동체'},
+    {answer:'생각', clue:'머릿속으로 판단하고 헤아리는 일'},
+    // 다 hub
+    {answer:'다리', clue:'강이나 계곡을 건너게 해주는 구조물'},
+    {answer:'다섯', clue:'숫자 5를 뜻하는 순우리말'},
+    {answer:'다짐', clue:'마음을 굳게 먹고 결심하는 것'},
+    {answer:'다행', clue:'뜻밖에 일이 잘 풀려 안심되는 상태'},
+    // 마 hub
+    {answer:'마음', clue:'생각과 감정이 자리잡은 곳'},
+    {answer:'마법', clue:'현실에서는 일어나지 않는 신비한 힘'},
+    {answer:'마을', clue:'여러 집이 모여 이루는 작은 동네'},
+    {answer:'마차', clue:'말이 끄는 옛날 탈것'},
+    // 여 hub
+    {answer:'여행', clue:'낯선 곳으로 떠나는 일'},
+    {answer:'여름', clue:'덥고 매미가 우는 계절'},
+    {answer:'여자', clue:'성별이 여성인 사람'},
+    {answer:'여우', clue:'꾀가 많다고 알려진 동물'},
+    // 구 hub
+    {answer:'구름', clue:'하늘에 떠 있는 하얀 덩어리'},
+    {answer:'구두', clue:'가죽으로 만든 정장용 신발'},
+    {answer:'축구', clue:'발로 공을 차서 골을 넣는 운동'},
+    {answer:'야구', clue:'방망이로 공을 치는 운동'},
+    {answer:'친구', clue:'가깝게 지내며 마음을 나누는 사람'},
+    {answer:'지구', clue:'우리가 살고 있는 행성'},
+    // 자 hub
+    {answer:'자연', clue:'산과 바다처럼 사람이 만들지 않은 것'},
+    {answer:'자유', clue:'구속받지 않고 마음대로 할 수 있는 상태'},
+    {answer:'자매', clue:'여자 형제 사이를 이르는 말'},
+    {answer:'잠자리', clue:'여름에 날아다니는 긴 날개 곤충'},
+    // 리 hub
+    {answer:'자리', clue:'앉거나 서 있는 그 곳'},
+    {answer:'우리', clue:'나를 포함한 여럿을 가리키는 말'},
+    {answer:'오리', clue:'꽥꽥 우는 물새'},
+    {answer:'거리', clue:'두 지점 사이의 떨어진 정도'},
+    {answer:'머리', clue:'생각을 담당하는 몸의 윗부분'},
+    {answer:'유리', clue:'투명하고 깨지기 쉬운 재료'},
+    // 눈 hub
+    {answer:'눈물', clue:'슬프거나 감동할 때 흐르는 것'},
+    {answer:'눈사람', clue:'겨울에 눈을 뭉쳐 만드는 것'},
+    {answer:'눈꽃', clue:'눈송이가 만들어내는 결정 모양'},
+    // 행 hub
+    {answer:'행복', clue:'마음이 만족스럽고 즐거운 상태'},
+    {answer:'행운', clue:'뜻밖에 찾아오는 좋은 운'},
+    // 지 hub
+    {answer:'지도', clue:'길을 찾을 때 펼쳐보는 그림'},
+    {answer:'지붕', clue:'집의 가장 꼭대기를 덮는 부분'},
+    {answer:'편지', clue:'마음을 담아 손으로 쓰는 글'},
+    {answer:'일지', clue:'매일의 기록을 남기는 문서'},
+    // 음 hub
+    {answer:'음악', clue:'귀를 즐겁게 하는 소리의 예술'},
+    {answer:'음식', clue:'먹기 위해 만든 것'},
+    // 계 hub
+    {answer:'계절', clue:'봄여름가을겨울을 부르는 말'},
+    {answer:'계단', clue:'한 칸씩 밟아 오르내리는 구조'},
+    {answer:'시계', clue:'시간을 알려주는 둥근 물건'},
+    // 별 / 달 / 별빛 계열
+    {answer:'별빛', clue:'밤하늘에서 반짝이는 빛'},
+    {answer:'별명', clue:'본명 대신 부르는 다른 이름'},
+    {answer:'달빛', clue:'밤에 은은하게 비추는 빛'},
+    {answer:'달력', clue:'날짜와 요일을 정리해둔 것'},
+    // 우 hub
+    {answer:'우산', clue:'비 올 때 머리 위에 펴는 물건'},
+    {answer:'우정', clue:'친구 사이에 쌓이는 믿음'},
+    {answer:'우주', clue:'별과 행성이 떠 있는 끝없는 공간'},
+    // 물 hub
     {answer:'선물', clue:'마음을 담아 건네는 물건'},
+    {answer:'보물', clue:'숨겨져 있어 찾으면 기쁜 귀한 것'},
+    {answer:'동물', clue:'스스로 움직이며 사는 생명체'},
+    // 술 / 기타
     {answer:'약속', clue:'꼭 지키기로 서로 다짐한 것'},
-    {answer:'거짓말', clue:'사실이 아닌데 진짜처럼 하는 말'},
-    {answer:'비밀', clue:'남에게 말하지 않기로 한 이야기'},
     {answer:'용기', clue:'두려움을 이기고 나아가는 힘'},
     {answer:'희망', clue:'앞날이 좋아질 거라 믿는 마음'},
     {answer:'평화', clue:'다툼 없이 고요하고 안전한 상태'},
-    {answer:'자유', clue:'구속받지 않고 마음대로 할 수 있는 상태'},
     {answer:'정의', clue:'옳고 그름을 바르게 가르는 원칙'},
     {answer:'거울', clue:'자신의 모습을 비춰보는 물건'},
-    {answer:'시계', clue:'시간을 알려주는 둥근 물건'},
     {answer:'창문', clue:'방 안에서 바깥을 내다보는 곳'},
-    {answer:'계단', clue:'한 칸씩 밟아 오르내리는 구조'},
-    {answer:'지붕', clue:'집의 가장 꼭대기를 덮는 부분'},
     {answer:'정원', clue:'꽃과 나무를 가꾸는 마당'},
     {answer:'분수', clue:'물이 위로 솟구치는 조형물'},
     {answer:'호수', clue:'잔잔하고 넓은 민물 웅덩이'},
     {answer:'폭포', clue:'높은 곳에서 쏟아지는 물줄기'},
-    {answer:'무지개', clue:'비 온 뒤 하늘에 뜨는 일곱 빛깔 다리'},
-    {answer:'눈꽃', clue:'눈송이가 만들어내는 결정 모양'},
-    {answer:'촛불', clue:'심지에 불을 붙여 밝히는 작은 빛'},
-    {answer:'풍선', clue:'바람을 불어 넣어 부풀리는 물건'},
     {answer:'인형', clue:'사람이나 동물 모양의 장난감'},
     {answer:'담요', clue:'추울 때 몸을 덮는 부드러운 천'},
     {answer:'베개', clue:'잠잘 때 머리를 받치는 물건'},
     {answer:'일상', clue:'특별할 것 없는 평범한 하루하루'},
     {answer:'휴식', clue:'하던 일을 멈추고 쉬는 시간'},
-    {answer:'꿈나라', clue:'잠들어 꿈을 꾸는 상상의 세계'},
-    {answer:'상상력', clue:'없는 것을 마음속에 그려내는 힘'},
-    {answer:'호기심', clue:'궁금해서 알고 싶어지는 마음'},
     {answer:'인연', clue:'우연이 아닌 것처럼 이어지는 만남'},
     {answer:'동행', clue:'누군가와 함께 걷는 길'},
     {answer:'응원', clue:'힘내라고 마음을 보태는 일'},
-    {answer:'감사', clue:'고마운 마음을 표현하는 것'},
     {answer:'축하', clue:'기쁜 일을 함께 나누며 하는 말'},
     {answer:'포옹', clue:'두 팔로 꼭 안아주는 행동'}
   ];
+
+  function countSharedSyllables(a, b){
+    let n = 0;
+    for (let i=0;i<a.length;i++) if (b.includes(a[i])) n++;
+    return n;
+  }
+
+  function orderForConnectivity(wordsArr, count){
+    const pool = [...wordsArr];
+    if (pool.length === 0) return [];
+    const max = count || pool.length;
+    const selected = [pool[0]];
+    const remaining = pool.slice(1);
+    while (selected.length < max && remaining.length > 0) {
+      let bestIdx = -1, bestScore = 0;
+      for (let i=0;i<remaining.length;i++){
+        const score = selected.reduce((sum, s) => sum + countSharedSyllables(s.answer, remaining[i].answer), 0);
+        if (score > bestScore) { bestScore = score; bestIdx = i; }
+      }
+      if (bestIdx !== -1) {
+        selected.push(remaining[bestIdx]);
+        remaining.splice(bestIdx, 1);
+      } else {
+        selected.push(remaining.shift());
+      }
+    }
+    return selected;
+  }
 
   function pickRandomWords(count){
     const pool = [...WORD_BANK];
@@ -441,7 +502,24 @@
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    return pool.slice(0, Math.min(count, pool.length));
+    // build a chain purely from overlapping candidates; stop early rather than
+    // force in a word that shares nothing with what's already selected
+    const selected = [pool[0]];
+    const remaining = pool.slice(1);
+    while (selected.length < count && remaining.length > 0) {
+      let bestIdx = -1, bestScore = 0;
+      for (let i=0;i<remaining.length;i++){
+        const score = selected.reduce((sum, s) => sum + countSharedSyllables(s.answer, remaining[i].answer), 0);
+        if (score > bestScore) { bestScore = score; bestIdx = i; }
+      }
+      if (bestIdx !== -1) {
+        selected.push(remaining[bestIdx]);
+        remaining.splice(bestIdx, 1);
+      } else {
+        break;
+      }
+    }
+    return selected;
   }
 
   async function generateWordsFromPhoto(dataUrl, hint){
@@ -596,15 +674,20 @@ ${hint ? `- 다음 테마를 참고해줘: ${hint}` : ''}
   function renderSolve(){
     const { photo, puzzle } = currentPuzzle;
     const solved = state.solved;
+    const containerWidth = root.clientWidth || 400;
+    const gap = 3;
+    const fit = Math.floor((containerWidth - 40 - (puzzle.cols - 1) * gap) / puzzle.cols);
+    const cellSize = Math.max(20, Math.min(30, fit));
+    const fontSize = Math.max(11, Math.round(cellSize * 0.5));
     root.innerHTML = `
       <div class="plc-wrap">
         <button class="plc-back" id="back">← 처음으로</button>
         <div class="plc-eyebrow">${solved ? '해제 완료' : '잠긴 퍼즐'}</div>
         <h1 class="plc-title">${solved ? '사진이 공개됐어요' : '십자말풀이를 완성하면 사진이 열려요'}</h1>
         ${solved ? '<div class="plc-solved-banner">🔓 모든 칸을 맞혔어요</div>' : ''}
-        <div class="plc-vault ${solved ? 'solved' : ''}" id="vault" style="width:${puzzle.cols*33+20}px; max-width:100%; margin:0 auto 18px;">
+        <div class="plc-vault ${solved ? 'solved' : ''}" id="vault" style="width:${puzzle.cols*(cellSize+gap)+20}px; max-width:100%; margin:0 auto 18px;">
           <div class="plc-vault-photo" style="background-image:url('${photo}')"></div>
-          <div class="plc-grid" id="grid" style="grid-template-columns: repeat(${puzzle.cols}, 30px);"></div>
+          <div class="plc-grid" id="grid" style="grid-template-columns: repeat(${puzzle.cols}, ${cellSize}px); gap:${gap}px;"></div>
         </div>
         <div class="plc-clues">
           <div>
@@ -623,29 +706,37 @@ ${hint ? `- 다음 테마를 참고해줘: ${hint}` : ''}
     puzzle.cells.forEach((row, r) => {
       row.forEach((cell, c) => {
         const div = document.createElement('div');
-        if (!cell) { div.className = 'plc-cell void'; gridEl.appendChild(div); return; }
+        if (!cell) { div.className = 'plc-cell void'; div.style.width = cellSize+'px'; div.style.height = cellSize+'px'; gridEl.appendChild(div); return; }
         div.className = 'plc-cell filled';
+        div.style.width = cellSize+'px';
+        div.style.height = cellSize+'px';
         const key = r+'_'+c;
         // no per-cell correctness feedback while solving — only reveal is on full completion
-        div.innerHTML = `${cell.num ? `<span class="num">${cell.num}</span>` : ''}<input maxlength="1" data-r="${r}" data-c="${c}" value="${userGrid[key]||''}" ${solved?'disabled':''}>`;
+        div.innerHTML = `${cell.num ? `<span class="num">${cell.num}</span>` : ''}<input data-r="${r}" data-c="${c}" value="${userGrid[key]||''}" style="font-size:${fontSize}px;" ${solved?'disabled':''}>`;
         gridEl.appendChild(div);
       });
     });
 
     if (!solved) {
+      function finalizeCell(inputEl){
+        const val = inputEl.value.slice(-1);
+        inputEl.value = val;
+        userGrid[inputEl.dataset.r+'_'+inputEl.dataset.c] = val;
+        checkSolved();
+        const r = +inputEl.dataset.r, c = +inputEl.dataset.c;
+        if (val) {
+          const next = gridEl.querySelector(`input[data-r="${r}"][data-c="${c+1}"]`);
+          if (next) next.focus();
+        }
+      }
       gridEl.querySelectorAll('input').forEach(inp => {
-        inp.oninput = (e) => {
-          const val = e.target.value.slice(-1);
-          e.target.value = val;
-          userGrid[e.target.dataset.r+'_'+e.target.dataset.c] = val;
-          checkSolved();
-          // move focus to next filled cell to the right
-          const r = +e.target.dataset.r, c = +e.target.dataset.c;
-          if (val) {
-            const next = gridEl.querySelector(`input[data-r="${r}"][data-c="${c+1}"]`);
-            if (next) next.focus();
-          }
-        };
+        inp.addEventListener('input', (e) => {
+          if (e.isComposing) return; // let IME finish composing the syllable first
+          finalizeCell(e.target);
+        });
+        inp.addEventListener('compositionend', (e) => {
+          finalizeCell(e.target);
+        });
       });
     }
 
@@ -673,30 +764,16 @@ ${hint ? `- 다음 테마를 참고해줘: ${hint}` : ''}
 
     function tryLayout(orderedWords){
       const placed = [];
+      const skipped = [];
       const occ = {};
 
       function canPlace(answer, dir, row, col){
-        const beforeR = dir==='down' ? row-1 : row;
-        const beforeC = dir==='across' ? col-1 : col;
-        if (occ[beforeR+','+beforeC] !== undefined) return false;
-        const afterR = dir==='down' ? row+answer.length : row;
-        const afterC = dir==='across' ? col+answer.length : col;
-        if (occ[afterR+','+afterC] !== undefined) return false;
-
         for (let i=0;i<answer.length;i++){
           const r = dir==='down' ? row+i : row;
           const c = dir==='across' ? col+i : col;
           const key = r+','+c;
           const existing = occ[key];
-          if (existing !== undefined){
-            if (existing !== answer[i]) return false;
-          } else {
-            if (dir === 'across'){
-              if (occ[(r-1)+','+c] !== undefined || occ[(r+1)+','+c] !== undefined) return false;
-            } else {
-              if (occ[r+','+(c-1)] !== undefined || occ[r+','+(c+1)] !== undefined) return false;
-            }
-          }
+          if (existing !== undefined && existing !== answer[i]) return false;
         }
         return true;
       }
@@ -710,7 +787,6 @@ ${hint ? `- 다음 테마를 참고해줘: ${hint}` : ''}
 
       place(orderedWords[0].answer, 'across', 0, 0);
       placed.push({...orderedWords[0], dir:'across', row:0, col:0});
-      let connectedCount = 1;
 
       for (let i=1;i<orderedWords.length;i++){
         const w = orderedWords[i];
@@ -731,13 +807,34 @@ ${hint ? `- 다음 테마를 참고해줘: ${hint}` : ''}
         if (bestSpot){
           place(w.answer, bestSpot.dir, bestSpot.row, bestSpot.col);
           placed.push({...w, dir:bestSpot.dir, row:bestSpot.row, col:bestSpot.col});
-          connectedCount++;
         } else {
-          const rows = placed.map(p => p.dir==='down' ? p.row+p.answer.length-1 : p.row);
-          const maxRow = Math.max(...rows, 0);
-          const row = maxRow + 2, col = 0;
-          place(w.answer, 'across', row, col);
-          placed.push({...w, dir:'across', row, col});
+          // can't interlock this word anywhere yet — skip it rather than
+          // bolt it on disconnected; a later attempt or later word may still work
+          skipped.push(w);
+        }
+      }
+      // second pass: retry skipped words now that more of the grid is filled in
+      let stillSkipped = [];
+      for (const w of skipped){
+        let bestSpot = null;
+        for (let pi=0; pi<placed.length && !bestSpot; pi++){
+          const p = placed[pi];
+          for (let a=0;a<w.answer.length && !bestSpot;a++){
+            for (let b=0;b<p.answer.length && !bestSpot;b++){
+              if (w.answer[a] !== p.answer[b]) continue;
+              const newDir = p.dir === 'across' ? 'down' : 'across';
+              let row, col;
+              if (newDir === 'down'){ row = p.row - a; col = p.col + b; }
+              else { row = p.row + b; col = p.col - a; }
+              if (canPlace(w.answer, newDir, row, col)) bestSpot = {dir:newDir, row, col};
+            }
+          }
+        }
+        if (bestSpot){
+          place(w.answer, bestSpot.dir, bestSpot.row, bestSpot.col);
+          placed.push({...w, dir:bestSpot.dir, row:bestSpot.row, col:bestSpot.col});
+        } else {
+          stillSkipped.push(w);
         }
       }
 
@@ -749,14 +846,19 @@ ${hint ? `- 다음 테마를 참고해줘: ${hint}` : ''}
         minC = Math.min(minC, p.col); maxC = Math.max(maxC, endC);
       });
       const area = (maxR-minR+1) * (maxC-minC+1);
-      return { placed, connectedCount, minR, maxR, minC, maxC, area };
+      return { placed, minR, maxR, minC, maxC, area };
     }
 
-    // try many random orderings (longest word always first as anchor) and keep the best-connected, tightest layout
-    const base = [...words].sort((a,b) => b.answer.length - a.answer.length);
-    let best = null;
-    const attempts = Math.min(60, 15 + words.length * 4);
-    for (let attempt=0; attempt<attempts; attempt++){
+    // The incoming order (from pickRandomWords, or the AI) already tends to place
+    // each word after something it overlaps with — try that order first, since
+    // re-sorting by length would throw away that guarantee. Then explore shuffles
+    // to see if a different order lets MORE words interlock, keeping the best —
+    // any word that still can't interlock anywhere is left out entirely, so the
+    // final puzzle is always fully connected.
+    const base = [...words];
+    let best = tryLayout(base);
+    const attempts = Math.min(120, 20 + words.length * 6);
+    for (let attempt=0; attempt<attempts && best.placed.length < words.length; attempt++){
       const rest = base.slice(1);
       for (let i=rest.length-1;i>0;i--){
         const j = Math.floor(Math.random()*(i+1));
@@ -764,11 +866,11 @@ ${hint ? `- 다음 테마를 참고해줘: ${hint}` : ''}
       }
       const ordered = [base[0], ...rest];
       const result = tryLayout(ordered);
-      if (!best || result.connectedCount > best.connectedCount ||
-          (result.connectedCount === best.connectedCount && result.area < best.area)) {
+      if (result.placed.length > best.placed.length ||
+          (result.placed.length === best.placed.length && result.area < best.area)) {
         best = result;
       }
-      if (best.connectedCount === words.length) break;
+      if (best.placed.length === words.length) break;
     }
 
     const { placed, minR, maxR, minC, maxC } = best;
