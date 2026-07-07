@@ -318,8 +318,39 @@ html, body {
       }
 
       loadingBox.innerHTML = `<div class="plc-loading"><div class="plc-spinner"></div>퍼즐을 배치하는 중...</div>`;
-      const ordered = orderForConnectivity(unique);
-      const puzzle = buildCrossword(ordered);
+
+      function shuffle(arr){
+        const a = [...arr];
+        for (let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+        return a;
+      }
+      function scoreOf(pz){
+        const across = pz.words.filter(w=>w.dir==='across').length;
+        const down = pz.words.filter(w=>w.dir==='down').length;
+        return { across, down, min: Math.min(across, down) };
+      }
+
+      let bestPuzzle = null, bestScore = null;
+      const maxAttempts = 8;
+      for (let attempt=0; attempt<maxAttempts; attempt++){
+        let candidateWords;
+        if (usedBank){
+          const fresh = pickRandomWords(30)
+            .map(w => ({ answer: w.answer, clue: w.clue }));
+          candidateWords = fresh;
+        } else {
+          candidateWords = shuffle(unique);
+        }
+        const orderedCandidate = orderForConnectivity(candidateWords);
+        const candidatePuzzle = buildCrossword(orderedCandidate);
+        if (!candidatePuzzle) continue;
+        const s = scoreOf(candidatePuzzle);
+        if (!bestScore || s.min > bestScore.min || (s.min === bestScore.min && candidatePuzzle.words.length > bestPuzzle.words.length)) {
+          bestPuzzle = candidatePuzzle; bestScore = s;
+        }
+        if (bestScore.min >= 3) break;
+      }
+      const puzzle = bestPuzzle;
       if (!puzzle) { errBox.textContent = '퍼즐을 생성하지 못했어요. 다시 시도해주세요.'; genBtn.disabled=false; loadingBox.innerHTML=''; return; }
       puzzle.source = usedBank ? 'bank' : 'ai';
 
