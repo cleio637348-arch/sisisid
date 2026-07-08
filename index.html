@@ -892,24 +892,31 @@ html, body {
     });
 
     if (!solved) {
-      function finalizeCell(inputEl){
+      function saveValue(inputEl){
         const val = inputEl.value.slice(-1);
         inputEl.value = val;
         userGrid[inputEl.dataset.r+'_'+inputEl.dataset.c] = val;
         checkSolved();
+      }
+      function goNext(inputEl){
         const r = +inputEl.dataset.r, c = +inputEl.dataset.c;
-        if (val) {
-          const next = gridEl.querySelector(`input[data-r="${r}"][data-c="${c+1}"]`);
-          if (next) next.focus();
-        }
+        const next = gridEl.querySelector(`input[data-r="${r}"][data-c="${c+1}"]`);
+        if (next) next.focus();
       }
       gridEl.querySelectorAll('input').forEach(inp => {
-        inp.addEventListener('input', (e) => {
-          if (e.isComposing) return; // let IME finish composing the syllable first
-          finalizeCell(e.target);
+        // No auto-advance on input — mobile Hangul keyboards don't reliably signal
+        // "syllable complete", so guessing when to jump cells was unreliable.
+        // Only move on: Enter (explicit confirm) or the user clicking elsewhere
+        // (blur just saves whatever's in the box, it doesn't force focus anywhere).
+        inp.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            saveValue(e.target);
+            goNext(e.target);
+          }
         });
-        inp.addEventListener('compositionend', (e) => {
-          finalizeCell(e.target);
+        inp.addEventListener('blur', (e) => {
+          if (e.target.value) saveValue(e.target);
         });
       });
     }
